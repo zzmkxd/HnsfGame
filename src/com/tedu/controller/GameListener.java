@@ -2,7 +2,7 @@ package com.tedu.controller;
 
 
 //监听类
-
+//666
 import com.tedu.element.ElementObj;
 import com.tedu.manager.ElementManager;
 import com.tedu.manager.GameElement;
