@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 
 public class Tool extends ElementObj {
-    public enum Type { HEAL, DOUBLE }
+    public enum Type { HEAL, DOUBLE, INVINCIBLE }
     private Type type;
 
     public Tool(){}
@@ -24,7 +24,13 @@ public class Tool extends ElementObj {
             }
         }
         if(type==null) type = Type.HEAL;
-        String path = type==Type.HEAL ? "image/tool/01.png" : "image/tool/02.png";
+        String path;
+        switch(type){
+            case HEAL: path = "image/tool/01.png"; break;
+            case DOUBLE: path = "image/tool/02.png"; break;
+            case INVINCIBLE: path = "image/tool/03.png"; break;
+            default: path = "image/tool/01.png";
+        }
         ImageIcon icon = new ImageIcon(path);
         setIcon(icon);
         setW(icon.getIconWidth());

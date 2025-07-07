@@ -57,14 +57,28 @@ public class GameMainJPanel extends JPanel implements Runnable {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        // 保证面板尺寸跟随父容器（窗口）
+        if(getParent()!=null){
+            Dimension parentSize = getParent().getSize();
+            if(!parentSize.equals(getSize())){
+                setSize(parentSize);
+            }
+        }
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        double scaleX = getWidth()/900.0;
+        double scaleY = getHeight()/600.0;
+        g2.scale(scaleX, scaleY);
+
         Map<GameElement, List<ElementObj>> all = em.getGameElements();
         for (GameElement ge : GameElement.values()) {
             List<ElementObj> list = all.get(ge);
             for (int i = 0; i < list.size(); i++) {
                 ElementObj obj = list.get(i);
-                obj.showElement(g);
+                obj.showElement(g2);
             }
         }
+        g2.dispose();
     }
 
     @Override
@@ -75,7 +89,8 @@ public class GameMainJPanel extends JPanel implements Runnable {
 
             // 检测玩家是否死亡
             List<ElementObj> plays = em.getElementsByKey(GameElement.PLAY);
-            if(plays.size()==0 && !gameOverShown){
+            List<ElementObj> enemys = em.getElementsByKey(GameElement.ENEMY);
+            if(plays.size()==0 && enemys.size()!=0 && !gameOverShown){
                 gameOverShown = true;
                 if(frame!=null){
                     frame.disableKeyListener();

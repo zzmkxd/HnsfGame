@@ -6,6 +6,7 @@ import com.tedu.element.Boss;
 import com.tedu.manager.ElementManager;
 import com.tedu.manager.GameElement;
 import com.tedu.manager.GameLoad;
+import com.tedu.element.TrackingBullet;
 import java.util.List;
 import java.util.Map;
 import com.tedu.util.SoundUtil;
@@ -19,6 +20,7 @@ public class GameThread extends Thread {
     private static final int MAX_LEVEL = 10; // 目前最多 10 关（对应 1.map~10.map）
     private volatile boolean active = true;  // 用于安全终止线程
     private com.tedu.show.GameJFrame frame;
+    private long lastToolSpawn = System.currentTimeMillis();
 
     public GameThread() {
         em = ElementManager.getManager();
@@ -70,6 +72,12 @@ public class GameThread extends Thread {
             ElementPk(players, enemyFiles);    // 敌人子弹击中玩家
             ElementPk(players, tools);        // 玩家拾取道具
 
+            // 第10关定时生成道具
+            if(currentLevel==10 && System.currentTimeMillis()-lastToolSpawn>=20000){
+                spawnRandomTool();
+                lastToolSpawn = System.currentTimeMillis();
+            }
+
             // 如果当前关卡没有敌人，关卡结束
             if(enemys.size()==0){
                 if(currentLevel==MAX_LEVEL){
@@ -87,7 +95,19 @@ public class GameThread extends Thread {
                     terminate();
                     return;
                 }
-                // 进入下一关
+                // 1-9 关所有敌人被消灭，提示进入下一关（阻塞，等待玩家确认）
+                if(frame!=null){
+                    javax.swing.JOptionPane.showMessageDialog(frame,
+                            "已消灭所有敌人，进入下一关！",
+                            "关卡完成",
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                }else{
+                    javax.swing.JOptionPane.showMessageDialog(null,
+                            "已消灭所有敌人，进入下一关！",
+                            "关卡完成",
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                }
+                // 玩家确认后进入下一关
                 currentLevel++;
                 return; // 跳出 gameRun，回到 run() 重新加载
             }
@@ -110,7 +130,7 @@ public class GameThread extends Thread {
                 if(!a.pk(b)) continue;
 
                 // 处理子弹 VS 地图
-                if((a instanceof com.tedu.element.PlayFile || a instanceof com.tedu.element.EnemyFile) && b instanceof com.tedu.element.MapObj){
+                if((a instanceof com.tedu.element.PlayFile || a instanceof com.tedu.element.EnemyFile || a instanceof com.tedu.element.TrackingBullet) && b instanceof com.tedu.element.MapObj){
                     com.tedu.element.MapObj map = (com.tedu.element.MapObj)b;
                     String name = map.getName();
                     if("GRASS".equals(name)){
@@ -127,8 +147,13 @@ public class GameThread extends Thread {
                         // 玩家子弹：对墙体造成伤害
                         map.setLive(false, a.getAttack());
                     }
-                    // 无论谁的子弹都销毁
-                    a.setLive(false);
+                    if(a instanceof com.tedu.element.TrackingBullet){
+                        // 追踪弹：摧毁地图但保留自身
+                        map.setLive(false);
+                    }else{
+                        // 其它子弹销毁
+                        a.setLive(false);
+                    }
                     break;
                 }
 
@@ -139,6 +164,15 @@ public class GameThread extends Thread {
                     pl.applyTool(tool.getType());
                     b.setLive(false);
                     continue;
+                }
+
+                // 玩家被追踪弹击中 -> Boss 恢复 20 HP
+                if(a instanceof com.tedu.element.Play && b instanceof com.tedu.element.TrackingBullet){
+                    com.tedu.element.TrackingBullet tb = (com.tedu.element.TrackingBullet)b;
+                    com.tedu.element.Boss boss = tb.getOwner();
+                    if(boss!=null && boss.isLive()){
+                        boss.setHp(Math.min(boss.getHp()+20, 100));
+                    }
                 }
 
                 // 通用逻辑
@@ -200,7 +234,8 @@ public class GameThread extends Thread {
                     if(r.intersects(m.getRectangle())){collide=true;break;}
                 }
             }while(collide);
-            String type = rand.nextBoolean()?"HEAL":"DOUBLE";
+            int t = rand.nextInt(3);
+            String type = t==0?"HEAL":(t==1?"DOUBLE":"INVINCIBLE");
             em.addElement(new com.tedu.element.Tool().createElement("x:"+x+",y:"+y+",type:"+type), GameElement.TOOL);
         }
         //全部加载完成，游戏启动
@@ -221,5 +256,27 @@ public class GameThread extends Thread {
         active = false;
         this.interrupt(); // 打断 sleep
         SoundUtil.stopBgm();
+    }
+
+    private void spawnRandomTool(){
+        java.util.Random rand = new java.util.Random();
+        List<ElementObj> maps = em.getElementsByKey(GameElement.MAPS);
+        int x,y; boolean collide;
+        do{
+            x = rand.nextInt(900-30);
+            y = rand.nextInt(600-30);
+            com.tedu.element.Tool tmp = new com.tedu.element.Tool();
+            tmp.setW(30); tmp.setH(30);
+            tmp.setX(x); tmp.setY(y);
+            java.awt.Rectangle r = tmp.getRectangle();
+            collide = false;
+            for(ElementObj m: maps){
+                if(r.intersects(m.getRectangle())){ collide=true; break; }
+            }
+        }while(collide);
+
+        int t = rand.nextInt(3);
+        String typeStr = t==0?"HEAL": (t==1?"DOUBLE":"INVINCIBLE");
+        em.addElement(new com.tedu.element.Tool().createElement("x:"+x+",y:"+y+",type:"+typeStr), GameElement.TOOL);
     }
 }

@@ -34,8 +34,10 @@ public class Play extends ElementObj{
 
     private boolean dmgBuff=false;
     private long buffEnd=0;
-    private int baseSpeed = 5;
-    private int curSpeed = 5;
+    private boolean invBuff=false;
+    private long invBuffEnd=0;
+    private int baseSpeed = 7;
+    private int curSpeed = 7;
     private int baseW;
     private int baseH;
 
@@ -52,11 +54,14 @@ public class Play extends ElementObj{
         this.setIcon(icon2);
         this.setW(icon2.getIconWidth());
         this.setH(icon2.getIconHeight());
-        baseW = icon2.getIconWidth();
-        baseH = icon2.getIconHeight();
+        // 尺寸整体缩小 6px
+        this.setW(this.getW()-6);
+        this.setH(this.getH()-6);
+        baseW = this.getW();
+        baseH = this.getH();
 
         this.setHp(maxHp);
-        this.setAttack(5);
+        this.setAttack(2);
         this.spawnTime = System.currentTimeMillis(); // 记录出生时间
         return this;
     }
@@ -75,6 +80,23 @@ public class Play extends ElementObj{
 
         // 绘制血条
         drawHpBar(g2);
+
+        // 无敌或buff遮罩
+        Color overlay = null;
+        boolean invActive = isInvincible() || isInvBuffActive();
+        if(invActive && dmgBuff){
+            overlay = new Color(128,0,128,80); // 紫色
+        }else if(invActive){
+            overlay = new Color(0,0,255,80);
+        }else if(dmgBuff){
+            overlay = new Color(255,0,0,80);
+        }
+        if(overlay!=null){
+            g2.setColor(overlay);
+            int radius = Math.max(this.getW(), this.getH()) + 10;
+            g2.fillOval(this.getX()-5, this.getY()-5, radius, radius);
+        }
+
         g2.dispose();
     }
 
@@ -95,8 +117,8 @@ public class Play extends ElementObj{
     }
 
     private boolean isInGrass(){
-        List<ElementObj> maps = ElementManager.getManager().getElementsByKey(GameElement.MAPS);
-        for(ElementObj obj: maps){
+        List<ElementObj> mapsSnapshot = new java.util.ArrayList<>(ElementManager.getManager().getElementsByKey(GameElement.MAPS));
+        for(ElementObj obj: mapsSnapshot){
             if(obj instanceof MapObj){
                 MapObj mo = (MapObj)obj;
                 if("GRASS".equals(mo.getName()) && this.pk(mo)){
@@ -117,21 +139,25 @@ public class Play extends ElementObj{
             switch (key) {
                 case java.awt.event.KeyEvent.VK_A: // A 左
                     this.left = true;
+                    this.right = this.up = this.down = false;
                     this.fx="left";
                     break;
                 case java.awt.event.KeyEvent.VK_W: // W 上
                     this.up = true;
+                    this.left = this.right = this.down = false;
                     this.fx="up";
                     break;
                 case java.awt.event.KeyEvent.VK_D: // D 右
                     this.right = true;
+                    this.left = this.up = this.down = false;
                     this.fx="right";
                     break;
                 case java.awt.event.KeyEvent.VK_S: // S 下
                     this.down = true;
+                    this.left = this.right = this.up = false;
                     this.fx="down";
                     break;
-                case 32:
+                case java.awt.event.KeyEvent.VK_J: // J 攻击
                     // 如果是首次按下，则立即发射一颗子弹
                     if(!this.pkType){
                         fireBullet();
@@ -150,7 +176,11 @@ public class Play extends ElementObj{
                 break;
                 case java.awt.event.KeyEvent.VK_S:this.down=false;
                 break;
-                case 32:this.pkType=false;
+                case java.awt.event.KeyEvent.VK_J:
+                    this.pkType=false; // 松开 J 结束连发
+                break;
+                case 32: // 兼容空格键停止攻击
+                    this.pkType=false;
                 break;
             }
         }
@@ -164,8 +194,16 @@ public class Play extends ElementObj{
             this.setW(baseW);
             this.setH(baseH);
         }
+        // 检查invBuff过期
+        if(invBuff && System.currentTimeMillis()>invBuffEnd){
+            invBuff=false;
+        }
 
         int speed = curSpeed;
+        // 河流减速
+        if(isInRiver()){
+            speed = Math.max(1, speed-2);
+        }
         ElementManager em = ElementManager.getManager();
         List<ElementObj> maps = em.getElementsByKey(GameElement.MAPS);
 
@@ -189,7 +227,7 @@ public class Play extends ElementObj{
         }
         if(this.down){
             int nextY = this.getY()+speed;
-            if(nextY<560-this.getH() && canThrough(this.getX(),nextY,maps)){
+            if(nextY<550-this.getH() && canThrough(this.getX(),nextY,maps)){
                 this.setY(nextY);
             }
         }
@@ -218,11 +256,34 @@ public class Play extends ElementObj{
                 return false;
             }
         }
-        // 3. 与敌人碰撞 -> 双方扣除较小的剩余生命值
+        // 3. 与敌人碰撞
         List<ElementObj> enemys = em.getElementsByKey(GameElement.ENEMY);
         for(ElementObj en: enemys){
             if(rect.intersects(en.getRectangle())){
-                // 双方扣除较小的剩余生命值
+                if(en instanceof com.tedu.element.Boss){
+                    // Boss 碰撞：弹开并扣4血
+                    this.setLive(true, 4);
+
+                    int dx = nextX - this.getX();
+                    int dy = nextY - this.getY();
+                    if(Math.abs(dx) > Math.abs(dy)){
+                        // 左右方向碰撞
+                        if(dx < 0){ // 向左移动撞到
+                            this.setX(en.getX() + en.getW() + 1);
+                        }else{ // 向右
+                            this.setX(en.getX() - this.getW() - 1);
+                        }
+                    }else{
+                        // 上下方向碰撞
+                        if(dy < 0){ // 向上
+                            this.setY(en.getY() + en.getH() + 1);
+                        }else{ // 向下
+                            this.setY(en.getY() - this.getH() - 1);
+                        }
+                    }
+                    return false;
+                }
+                // 其他敌人：双方扣较小生命值
                 int damage = Math.min(this.getHp(), en.getHp());
                 en.setLive(true, damage);
                 this.setLive(true, damage);
@@ -265,9 +326,42 @@ public class Play extends ElementObj{
     }
 
     private void fireBullet(){
-        ElementObj element = new PlayFile().createElement(this.toString());
-        element.setAttack(getCurrentAttack());
-        ElementManager.getManager().addElement(element, GameElement.PLAYFILE);
+        // 发射主子弹
+        ElementManager em = ElementManager.getManager();
+        createAndAddBullet(0,0, em);
+
+        if(dmgBuff){
+            // 额外左右/上下偏移的两颗子弹
+            int offset = 10;
+            switch(this.fx){
+                case "up":
+                case "down":
+                    createAndAddBullet(-offset,0, em);
+                    createAndAddBullet(offset,0, em);
+                    break;
+                case "left":
+                case "right":
+                    createAndAddBullet(0,-offset, em);
+                    createAndAddBullet(0,offset, em);
+                    break;
+            }
+        }
+    }
+
+    private void createAndAddBullet(int dx, int dy, ElementManager em){
+        // 根据当前方向，调整起点字符串
+        String base = this.toString(); // contains x:...,y:...
+        String[] pts = base.split(",");
+        int x=0,y=0; StringBuilder sb=new StringBuilder();
+        for(String p: pts){
+            if(p.startsWith("x:")){ x = Integer.parseInt(p.substring(2)); }
+            if(p.startsWith("y:")){ y = Integer.parseInt(p.substring(2)); }
+        }
+        x += dx; y += dy;
+        String data = String.format("x:%d,y:%d,f:%s", x,y,this.fx);
+        ElementObj bullet = new PlayFile().createElement(data);
+        bullet.setAttack(getCurrentAttack());
+        em.addElement(bullet, GameElement.PLAYFILE);
         SoundUtil.playEffect("audio/shoot.wav");
     }
 
@@ -277,10 +371,10 @@ public class Play extends ElementObj{
         int x = this.getX();
         int y = this.getY();
         switch(this.fx){
-            case "up":x+=16;break;
-            case "down":y+=25;x+=16;break;
-            case "left":y+=16;break;
-            case "right":x+=25;y+=16;break;
+            case "up":x+=13;break;
+            case "down":y+=21;x+=13;break;
+            case "left":y+=13;break;
+            case "right":x+=21;y+=13;break;
         }
         return "x:"+x+",y:"+y+",f:"+this.fx;
     }
@@ -288,8 +382,8 @@ public class Play extends ElementObj{
     @Override
     public void setLive(boolean live,int atk){
         long now = System.currentTimeMillis();
-        // 出生3秒内无敌
-        if(now - spawnTime < 3000){
+        // 出生无敌或buff无敌
+        if(now - spawnTime < 3000 || isInvBuffActive()){
             return;
         }
         super.setLive(live, atk);
@@ -303,20 +397,45 @@ public class Play extends ElementObj{
     }
 
     public void applyTool(com.tedu.element.Tool.Type type){
-        if(type== com.tedu.element.Tool.Type.HEAL){
-            this.setHp(maxHp);
-        }else{
-            dmgBuff = true;
-            buffEnd = System.currentTimeMillis()+2000;
-            curSpeed = baseSpeed + 5;
+        switch(type){
+            case HEAL:
+                this.setHp(Math.min(maxHp, this.getHp()+10));
+                break;
+            case DOUBLE:
+                dmgBuff = true;
+                buffEnd = System.currentTimeMillis()+6000; // 6 秒
+                curSpeed = baseSpeed*2;
+                break;
+            case INVINCIBLE:
+                invBuff = true;
+                invBuffEnd = System.currentTimeMillis()+3000; // 3 秒
+                break;
         }
     }
 
     private int getCurrentAttack(){
-        if(dmgBuff){
-            if(System.currentTimeMillis()>buffEnd){ dmgBuff=false; }
+        return this.getAttack();
+    }
+
+    private boolean isInRiver(){
+        List<ElementObj> maps = ElementManager.getManager().getElementsByKey(GameElement.MAPS);
+        for(ElementObj obj : maps){
+            if(obj instanceof MapObj){
+                MapObj mo = (MapObj)obj;
+                if("RIVER".equals(mo.getName()) && this.pk(mo)){
+                    return true;
+                }
+            }
         }
-        return dmgBuff? this.getAttack()*2 : this.getAttack();
+        return false;
+    }
+
+    private boolean isInvincible(){
+        return System.currentTimeMillis()-spawnTime < 3000;
+    }
+
+    private boolean isInvBuffActive(){
+        return invBuff && System.currentTimeMillis()<invBuffEnd;
     }
 
 }

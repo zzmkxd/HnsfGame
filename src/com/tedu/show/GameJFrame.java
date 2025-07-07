@@ -36,6 +36,8 @@ public class GameJFrame extends JFrame {
     }
     public void init() {
         this.setSize(GameX, GameY);
+        this.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        this.setResizable(true);
         this.setTitle("坦克大战");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setLocationRelativeTo(null);//窗口初始生成在屏幕正中间

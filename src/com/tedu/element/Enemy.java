@@ -15,7 +15,7 @@ public class Enemy extends ElementObj{
     private boolean up = false;
     private boolean down = false;
     private String fx = "up";
-    private String skinType; // "bot" 或 "play2"
+    private String skinType; // "bot"
     Random rand = new Random();
     private long lastTurnTime = 0;
     private long lastFireTime = 0; // 子弹发射计时
@@ -69,8 +69,8 @@ public class Enemy extends ElementObj{
     @Override
     public ElementObj createElement(String str){
         // 先设置尺寸，便于后续碰撞检测
-        this.setH(35);
-        this.setW(35);
+        this.setH(29);
+        this.setW(29);
 
         Random rand = new Random();
         ElementManager em = ElementManager.getManager();
@@ -82,10 +82,11 @@ public class Enemy extends ElementObj{
 
         int x,y;
         boolean collide;
+        boolean nearPlayer;
         // 随机生成坐标，直到不与任何地图块发生碰撞
         do {
-            x = rand.nextInt(900 - this.getW());
-            y = rand.nextInt(600 - this.getH());
+            x = rand.nextInt(800 - this.getW());
+            y = rand.nextInt(400 - this.getH());
             this.setX(x);
             this.setY(y);
 
@@ -97,7 +98,19 @@ public class Enemy extends ElementObj{
                     break;
                 }
             }
-        } while (collide);
+
+            // 与玩家距离判定
+            nearPlayer = false;
+            java.util.List<ElementObj> players = em.getElementsByKey(GameElement.PLAY);
+            for(ElementObj p : players){
+                int dx = p.getX() - this.getX();
+                int dy = p.getY() - this.getY();
+                if(dx*dx + dy*dy < 200*200){
+                    nearPlayer = true;
+                    break;
+                }
+            }
+        } while (collide || nearPlayer);
 
         this.setHp(maxHp);
         this.setAttack(5);
@@ -109,7 +122,7 @@ public class Enemy extends ElementObj{
 
     @Override
     public void move() {
-        int speed = 5;
+        int speed = 3;
         ElementManager em = ElementManager.getManager();
         List<ElementObj> players = em.getElementsByKey(GameElement.PLAY);
         boolean chasing = false;
@@ -150,7 +163,7 @@ public class Enemy extends ElementObj{
         }
         if(this.down){
             int nextY = this.getY()+speed;
-            if(nextY<560-this.getH() && canThrough(this.getX(),nextY,maps)) this.setY(nextY);
+            if(nextY<550-this.getH() && canThrough(this.getX(),nextY,maps)) this.setY(nextY);
         }
     }
 
@@ -263,7 +276,8 @@ public class Enemy extends ElementObj{
         em.addElement(new Boom().createElement(pos), GameElement.DIE);
         // 25% 掉落道具
         if(Math.random()<0.25){
-            String type = Math.random()<0.5?"HEAL":"DOUBLE";
+            double r = Math.random();
+            String type = r<0.33?"HEAL":(r<0.66?"DOUBLE":"INVINCIBLE");
             em.addElement(new Tool().createElement(pos+",type:"+type), GameElement.TOOL);
         }
     }
@@ -274,10 +288,10 @@ public class Enemy extends ElementObj{
         int x = this.getX();
         int y = this.getY();
         switch(this.fx){
-            case "up":x+=16;break;
-            case "down":y+=25;x+=16;break;
-            case "left":y+=16;break;
-            case "right":x+=25;y+=16;break;
+            case "up":x+=13;break;
+            case "down":y+=21;x+=13;break;
+            case "left":y+=13;break;
+            case "right":x+=21;y+=13;break;
         }
         return "x:"+x+",y:"+y+",f:"+this.fx;
     }

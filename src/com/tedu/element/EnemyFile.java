@@ -5,7 +5,7 @@ import java.awt.*;
 // 敌人子弹类（蓝色）
 public class EnemyFile extends ElementObj {
     private int attack = 2;
-    private int moveNum = 15;
+    private int moveNum = 5;
     private String fx;
 
     public EnemyFile(){}
