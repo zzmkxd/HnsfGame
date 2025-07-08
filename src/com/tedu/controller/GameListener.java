@@ -9,7 +9,6 @@ import com.tedu.manager.GameElement;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +18,7 @@ public class GameListener implements KeyListener{
 
     private Set<Integer> set = new HashSet<Integer>();
 
+    //用来加一点注释
     @Override
     public void keyTyped(KeyEvent e) {}
     @Override//按下：上下左右38 40 37 39
