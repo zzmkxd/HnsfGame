@@ -37,7 +37,7 @@ public class Tool extends ElementObj {
         setH(icon.getIconHeight());
         return this;
     }
-
+    //击杀后的图标更新
     @Override
     public void showElement(Graphics g){
         g.drawImage(getIcon().getImage(), getX(), getY(), null);
